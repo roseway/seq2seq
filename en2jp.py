@@ -10,10 +10,10 @@ def seq2seq(inp_len, inp_size, out_size):
 	encoder_input = Input(shape=(inp_len,))
 	decoder_input = Input(shape=(inp_len,))
 	encoder = Embedding(inp_size, 64, input_length=inp_len, mask_zero=True)(encoder_input)
-	encoder = LSTM(64, return_sequences=False)(encoder)
+	encoder, state_h, state_c = LSTM(64, return_state = True)(encoder)
 	
 	decoder = Embedding(out_size, 64, input_length=inp_len, mask_zero=True)(decoder_input)
-	decoder = LSTM(64, return_sequences=True)(decoder, initial_state=[encoder, encoder])
+	decoder = LSTM(64, return_sequences=True)(decoder, initial_state=[state_h, state_c])
 	decoder = TimeDistributed(Dense(out_size, activation="softmax"))(decoder)
 	
 	model = Model(inputs=[encoder_input, decoder_input], outputs=[decoder])
@@ -25,12 +25,13 @@ def seq2seq(inp_len, inp_size, out_size):
 def attention(inp_len, inp_size, out_size):
 	encoder_input = Input(shape=(inp_len,))
 	decoder_input = Input(shape=(inp_len,))
+	
 	encoder = Embedding(inp_size, 64, input_length=inp_len, mask_zero=True)(encoder_input)
-	encoder = LSTM(64, return_sequences=True, unroll=True)(encoder)
-	encoder_last = encoder[:, -1, :]
+	encoder, state_h, state_c = LSTM(64, return_sequences=True, unroll=True, return_state = True)(encoder)
+	#encoder_last = encoder[:, -1, :]
 
 	decoder = Embedding(out_size, 64, input_length=inp_len, mask_zero=True)(decoder_input)
-	decoder = LSTM(64, return_sequences=True, unroll=True)(decoder, initial_state=[encoder_last, encoder_last])
+	decoder = LSTM(64, return_sequences=True, unroll=True)(decoder, initial_state=[state_h, state_c])
 
 	attention = dot([decoder, encoder], axes=[2, 2])
 	attention = Activation('softmax')(attention)
@@ -90,6 +91,8 @@ test_input=pad_sequences(test_input, maxlen=seqlen,padding='post')
 
 test_output=ottk.texts_to_sequences(test_output)
 test_output=pad_sequences(test_output, maxlen=seqlen,padding='post')
+
+print(train_einput.shape, train_dinput.shape, train_output.shape)
 
 model=attention(seqlen, input_dict_size, output_dict_size)
 checkpoint = ModelCheckpoint('attention.h5', monitor='val_loss', verbose=1, save_best_only=True,
